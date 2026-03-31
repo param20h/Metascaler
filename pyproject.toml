@@ -1,0 +1,60 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sql-query-optimizer-openenv"
+version = "1.0.0"
+description = "An OpenEnv environment where AI agents learn to review, rewrite, and optimise SQL queries for correctness and performance."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+    {name = "metaXscaler", email = ""}
+]
+license = {text = "MIT"}
+keywords = ["openenv", "sql", "optimization", "ml", "agent", "environment"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    "fastapi>=0.111.0",
+    "uvicorn[standard]>=0.29.0",
+    "pydantic>=2.7.0",
+    "openai>=1.30.0",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "black>=23.0",
+    "ruff>=0.1.0",
+]
+
+[project.urls]
+Homepage = "https://huggingface.co/spaces"
+Repository = "https://github.com/metaXscaler/sql-query-optimizer-openenv"
+Documentation = "https://github.com/metaXscaler/sql-query-optimizer-openenv/blob/main/README.md"
+
+[tool.black]
+line-length = 100
+target-version = ['py310', 'py311', 'py312']
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+select = ["E", "F", "W"]
+ignore = ["E501"]  # Line too long (handled by black)
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
