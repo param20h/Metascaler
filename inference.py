@@ -1,0 +1,197 @@
+"""OpenAI-based inference runner for the SQL Query Optimizer OpenEnv environment.
+
+Environment variables:
+    API_BASE_URL: OpenAI-compatible API endpoint
+    MODEL_NAME: model identifier to use for inference
+    HF_TOKEN: API key / bearer token for the LLM provider
+
+The script emits structured stdout logs in three sections only:
+    [START] ...
+    [STEP] ...
+    [END] ...
+"""
+from __future__ import annotations
+
+import json
+import os
+import sys
+from collections import OrderedDict
+from typing import Any, Dict
+
+from openai import OpenAI
+
+sys.path.insert(0, os.path.dirname(__file__))
+
+from env.environment import SQLOptimizerEnv
+from env.models import Action
+
+DEFAULT_MAX_STEPS = 5
+TASK_IDS = (1, 2, 3)
+
+SYSTEM_PROMPT = """You are a database performance engineer.
+You will receive a broken or unoptimised SQL query along with table schema context.
+Your job is to rewrite the query so it is correct and performant.
+
+Respond ONLY with a JSON object with these exact keys:
+{
+  "rewritten_query": "<your improved SQL>",
+  "explanation": "<brief explanation of changes>",
+  "is_done": true
+}
+Do not wrap in markdown. Output raw JSON only."""
+
+
+def _load_runtime_config() -> Dict[str, str]:
+    api_base_url = os.getenv("API_BASE_URL", "").strip()
+    model_name = os.getenv("MODEL_NAME", "").strip()
+    hf_token = os.getenv("HF_TOKEN", "").strip()
+
+    missing = [
+        name
+        for name, value in (
+            ("API_BASE_URL", api_base_url),
+            ("MODEL_NAME", model_name),
+            ("HF_TOKEN", hf_token),
+        )
+        if not value
+    ]
+    if missing:
+        raise RuntimeError(f"Missing required environment variables: {', '.join(missing)}")
+
+    return {
+        "API_BASE_URL": api_base_url,
+        "MODEL_NAME": model_name,
+        "HF_TOKEN": hf_token,
+    }
+
+
+def _build_user_message(obs_dict: dict) -> str:
+    message = (
+        f"Task: {obs_dict['task_name']} ({obs_dict['task_id']} — difficulty: "
+        f"{obs_dict.get('difficulty', 'unknown')})\n\n"
+        f"Description:\n{obs_dict['task_description']}\n\n"
+        f"Schema:\n{obs_dict['schema_context']}\n\n"
+        f"Query to fix:\n{obs_dict['query']}"
+    )
+    if obs_dict.get("hint"):
+        message += f"\n\nHint: {obs_dict['hint']}"
+    return message
+
+
+def _log(prefix: str, payload: Dict[str, Any]) -> None:
+    print(f"{prefix} {json.dumps(payload, ensure_ascii=True, separators=(',', ':'))}")
+
+
+def _parse_json_action(text: str) -> Action:
+    parsed = json.loads(text)
+    return Action(
+        rewritten_query=parsed.get("rewritten_query", ""),
+        explanation=parsed.get("explanation", ""),
+        is_done=bool(parsed.get("is_done", False)),
+    )
+
+
+def run_inference() -> Dict[str, float]:
+    config = _load_runtime_config()
+    client = OpenAI(api_key=config["HF_TOKEN"], base_url=config["API_BASE_URL"])
+    env = SQLOptimizerEnv()
+
+    _log(
+        "[START]",
+        OrderedDict(
+            [
+                ("script", "inference.py"),
+                ("api_base_url", config["API_BASE_URL"]),
+                ("model_name", config["MODEL_NAME"]),
+                ("tasks", list(TASK_IDS)),
+            ]
+        ),
+    )
+
+    results: Dict[str, float] = {}
+    total_score = 0.0
+
+    for task_id in TASK_IDS:
+        observation = env.reset(task_id=task_id)
+        obs_dict = observation.model_dump()
+        final_grader_score = 0.0
+        step_count = 0
+
+        for step_number in range(DEFAULT_MAX_STEPS):
+            messages = [
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": _build_user_message(obs_dict)},
+            ]
+
+            try:
+                response = client.chat.completions.create(
+                    model=config["MODEL_NAME"],
+                    messages=messages,
+                    temperature=0.0,
+                    max_tokens=1024,
+                )
+                content = (response.choices[0].message.content or "").strip()
+                action = _parse_json_action(content)
+                llm_status = "ok"
+            except Exception as exc:
+                action = Action(rewritten_query="", explanation=f"error: {exc}", is_done=True)
+                llm_status = "error"
+
+            observation, reward, done, info = env.step(action)
+            obs_dict = observation.model_dump()
+            final_grader_score = float(info.get("grader_score", 0.0))
+            step_count = step_number + 1
+
+            _log(
+                "[STEP]",
+                OrderedDict(
+                    [
+                        ("task_id", task_id),
+                        ("task_name", obs_dict["task_name"]),
+                        ("step", step_count),
+                        ("grader_score", round(final_grader_score, 4)),
+                        ("reward_score", round(float(reward.score), 4)),
+                        ("done", bool(done)),
+                        ("llm_status", llm_status),
+                    ]
+                ),
+            )
+
+            if done:
+                break
+
+        task_key = f"task_{task_id}_{env._task.name}"
+        results[task_key] = round(final_grader_score, 4)
+        total_score += final_grader_score
+
+    average_score = round(total_score / len(TASK_IDS), 4)
+
+    _log(
+        "[END]",
+        OrderedDict(
+            [
+                ("task_results", results),
+                ("average_score", average_score),
+                ("status", "success"),
+            ]
+        ),
+    )
+    return results
+
+
+if __name__ == "__main__":
+    try:
+        run_inference()
+    except Exception as exc:
+        _log(
+            "[END]",
+            OrderedDict(
+                [
+                    ("task_results", {}),
+                    ("average_score", 0.0),
+                    ("status", "error"),
+                    ("error", str(exc)),
+                ]
+            ),
+        )
+        sys.exit(1)

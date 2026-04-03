@@ -19,6 +19,7 @@ from typing import Any, Dict, Optional
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+import uvicorn
 
 from env.environment import SQLOptimizerEnv
 from env.models import Action, Observation, Reward
@@ -79,13 +80,34 @@ class BaselineResponse(BaseModel):
     message: str
 
 
+def _parse_end_payload(stdout: str) -> Dict[str, Any]:
+    for line in reversed(stdout.splitlines()):
+        if not line.startswith("[END] "):
+            continue
+        payload_text = line[len("[END] ") :].strip()
+        import json
+
+        return json.loads(payload_text)
+    raise ValueError("Could not find [END] payload in inference output")
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Endpoints
 # ──────────────────────────────────────────────────────────────────────────────
 
+def _health_payload() -> Dict[str, str]:
+    return {"status": "ok", "environment": "sql-query-optimizer", "version": "1.0.0"}
+
+
 @app.get("/", summary="Health check")
 def health() -> Dict[str, str]:
-    return {"status": "ok", "environment": "sql-query-optimizer", "version": "1.0.0"}
+    return _health_payload()
+
+
+@app.get("/web", include_in_schema=False)
+@app.get("/web/", include_in_schema=False)
+def web_health() -> Dict[str, str]:
+    return _health_payload()
 
 
 @app.post("/reset", response_model=Observation, summary="Start / restart an episode")
@@ -147,30 +169,42 @@ def grader() -> GraderResponse:
 @app.post("/baseline", response_model=BaselineResponse, summary="Run baseline inference on all tasks")
 def baseline() -> BaselineResponse:
     """
-    Trigger the baseline inference script (baseline.py) and return scores.
-    Requires OPENAI_API_KEY to be set in the environment.
+    Trigger the baseline inference script (inference.py) and return scores.
+    Requires API_BASE_URL, MODEL_NAME, and HF_TOKEN to be set in the environment.
     """
-    if not os.getenv("OPENAI_API_KEY"):
+    required_vars = ["API_BASE_URL", "MODEL_NAME", "HF_TOKEN"]
+    missing = [name for name in required_vars if not os.getenv(name)]
+    if missing:
         raise HTTPException(
             status_code=400,
-            detail="OPENAI_API_KEY environment variable not set. Cannot run baseline.",
+            detail=f"Missing required environment variables: {', '.join(missing)}",
         )
     try:
         result = subprocess.run(
-            [sys.executable, "baseline.py", "--json"],
+            [sys.executable, "inference.py"],
             capture_output=True,
             text=True,
-            timeout=300,
+            timeout=1200,
         )
         if result.returncode != 0:
             raise HTTPException(
                 status_code=500,
-                detail=f"Baseline script failed:\n{result.stderr}",
+                detail=f"Inference script failed:\n{result.stderr}",
             )
-        import json
-        scores = json.loads(result.stdout)
-        return BaselineResponse(task_results=scores, message="Baseline completed successfully.")
+        payload = _parse_end_payload(result.stdout)
+        return BaselineResponse(
+            task_results=payload.get("task_results", {}),
+            message="Baseline completed successfully.",
+        )
     except subprocess.TimeoutExpired:
-        raise HTTPException(status_code=500, detail="Baseline script timed out after 300s.")
+        raise HTTPException(status_code=500, detail="Inference script timed out after 1200s.")
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+def main() -> None:
+    uvicorn.run("server.app:app", host="0.0.0.0", port=7860)
+
+
+if __name__ == "__main__":
+    main()

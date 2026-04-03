@@ -1,8 +1,21 @@
+---
+title: SQL Query Optimizer Environment Server
+emoji: 🐳
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+pinned: false
+app_port: 7860
+base_path: /web
+tags:
+  - openenv
+---
+
 # SQL Query Optimizer — OpenEnv Environment
 
 An **OpenEnv-compliant** environment where AI agents learn to review, rewrite, and optimise SQL queries across three real-world failure patterns.
 
-> **HF Spaces**: [your-username/sql-query-optimizer](https://huggingface.co/spaces/your-username/sql-query-optimizer)
+> **HF Spaces**: [param20h/sql-query-optimizer](https://huggingface.co/spaces/param20h/sql-query-optimizer)
 
 ---
 
@@ -103,7 +116,9 @@ Interactive docs: `http://localhost:7860/docs`
 ### Prerequisites
 - Python 3.10+
 - Docker
-- `OPENAI_API_KEY` (for baseline only)
+- `API_BASE_URL` (OpenAI-compatible endpoint for inference)
+- `MODEL_NAME` (model identifier for inference)
+- `HF_TOKEN` (API key / bearer token for inference)
 
 ### Local (Python)
 
@@ -122,8 +137,10 @@ docker run -p 7860:7860 -e OPENAI_API_KEY=sk-... sql-optimizer-env
 ### Baseline Inference
 
 ```bash
-export OPENAI_API_KEY=sk-...
-python baseline.py
+$env:API_BASE_URL="https://api.openai.com/v1"
+$env:MODEL_NAME="gpt-4o-mini"
+$env:HF_TOKEN="hf_or_openai_api_key_here"
+python inference.py
 ```
 
 ### OpenEnv Validation
@@ -139,6 +156,16 @@ openenv validate
 pip install huggingface_hub
 huggingface-cli login
 openenv push --repo-id your-username/sql-query-optimizer
+```
+
+### Environment Configuration
+
+Define these variables before running inference or `/baseline`:
+
+```powershell
+$env:API_BASE_URL = "https://api.openai.com/v1"
+$env:MODEL_NAME = "gpt-4o-mini"
+$env:HF_TOKEN = "your_api_key"
 ```
 
 ---
