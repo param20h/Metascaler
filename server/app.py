@@ -111,6 +111,7 @@ def web_health() -> Dict[str, str]:
 
 
 @app.post("/reset", response_model=Observation, summary="Start / restart an episode")
+@app.post("/web/reset", response_model=Observation, include_in_schema=False)
 def reset(req: ResetRequest) -> Observation:
     """Reset the environment for a given task_id (1=easy, 2=medium, 3=hard)."""
     try:
@@ -121,6 +122,7 @@ def reset(req: ResetRequest) -> Observation:
 
 
 @app.post("/step", response_model=StepResponse, summary="Submit an action")
+@app.post("/web/step", response_model=StepResponse, include_in_schema=False)
 def step(action: Action) -> StepResponse:
     """Advance the environment by submitting an Action."""
     try:
@@ -131,12 +133,14 @@ def step(action: Action) -> StepResponse:
 
 
 @app.get("/state", summary="Return current internal state")
+@app.get("/web/state", include_in_schema=False)
 def state() -> Dict[str, Any]:
     """Return the current internal state of the environment."""
     return _env.state()
 
 
 @app.get("/tasks", response_model=list[TaskInfo], summary="List tasks + action schema")
+@app.get("/web/tasks", response_model=list[TaskInfo], include_in_schema=False)
 def list_tasks() -> list[TaskInfo]:
     """Return all tasks with descriptions and the action schema."""
     action_schema = Action.model_json_schema()
@@ -153,6 +157,7 @@ def list_tasks() -> list[TaskInfo]:
 
 
 @app.get("/grader", response_model=GraderResponse, summary="Grader score for last episode")
+@app.get("/web/grader", response_model=GraderResponse, include_in_schema=False)
 def grader() -> GraderResponse:
     """Return the grader score after the current/last episode."""
     s = _env.state()
@@ -167,6 +172,7 @@ def grader() -> GraderResponse:
 
 
 @app.post("/baseline", response_model=BaselineResponse, summary="Run baseline inference on all tasks")
+@app.post("/web/baseline", response_model=BaselineResponse, include_in_schema=False)
 def baseline() -> BaselineResponse:
     """
     Trigger the baseline inference script (inference.py) and return scores.
