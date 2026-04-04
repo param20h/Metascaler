@@ -112,10 +112,11 @@ def web_health() -> Dict[str, str]:
 
 @app.post("/reset", response_model=Observation, summary="Start / restart an episode")
 @app.post("/web/reset", response_model=Observation, include_in_schema=False)
-def reset(req: ResetRequest) -> Observation:
+def reset(req: Optional[ResetRequest] = None) -> Observation:
     """Reset the environment for a given task_id (1=easy, 2=medium, 3=hard)."""
     try:
-        obs = _env.reset(task_id=req.task_id)
+        task_id = req.task_id if req is not None else 1
+        obs = _env.reset(task_id=task_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     return obs
