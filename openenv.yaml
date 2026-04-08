@@ -16,18 +16,21 @@ tasks:
   - id: 1
     name: fix-broken-join
     difficulty: easy
+    grader: deterministic
     description: >
       The agent must replace an implicit cross-join (comma syntax) with an
       explicit INNER JOIN ... ON clause.
   - id: 2
     name: eliminate-n-plus-one
     difficulty: medium
+    grader: deterministic
     description: >
       The agent must remove a correlated scalar subquery in the SELECT list
       and replace it with a single LEFT JOIN.
   - id: 3
     name: full-optimization
     difficulty: hard
+    grader: deterministic
     description: >
       The agent must fix four independent issues: remove redundant DISTINCT,
       replace SELECT *, eliminate a non-sargable CAST predicate, and add an
@@ -53,15 +56,15 @@ action:
 reward:
   type: object
   fields:
-    score: "float [0.0, 1.0]"
-    grader_score: "float [0.0, 1.0]"
+    score: "float (0.0, 1.0)"
+    grader_score: "float (0.0, 1.0)"
     breakdown:
       correctness: "float [0.0, 1.0]"
       performance: "float [0.0, 1.0]"
       style: "float [0.0, 1.0]"
       step_penalty: "float ≤ 0.0"
     feedback: string
-    cumulative_score: "float [0.0, 1.0]"
+    cumulative_score: "float (0.0, 1.0)"
 endpoints:
   - path: /reset
     method: POST
