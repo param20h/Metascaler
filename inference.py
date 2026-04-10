@@ -197,22 +197,11 @@ def run_inference() -> Dict[str, float]:
             / 3,
             4,
         )
-        ordered_scores = [
-            fallback_results["fix-broken-join"],
-            fallback_results["eliminate-n-plus-one"],
-            fallback_results["full-optimization"],
-        ]
         _log(
             "[END]",
             OrderedDict(
                 [
                     ("task_results", fallback_results),
-                    ("task_scores", ordered_scores),
-                    ("tasks", [
-                        {"task_id": 1, "name": "fix-broken-join", "score": fallback_results["fix-broken-join"]},
-                        {"task_id": 2, "name": "eliminate-n-plus-one", "score": fallback_results["eliminate-n-plus-one"]},
-                        {"task_id": 3, "name": "full-optimization", "score": fallback_results["full-optimization"]},
-                    ]),
                     ("average_score", average_score),
                     ("status", "success"),
                 ]
@@ -295,22 +284,11 @@ def run_inference() -> Dict[str, float]:
 
     average_score = round(total_score / len(TASK_IDS), 4)
 
-    ordered_scores = [
-        results.get("fix-broken-join", MIN_SCORE_EPS),
-        results.get("eliminate-n-plus-one", MIN_SCORE_EPS),
-        results.get("full-optimization", MIN_SCORE_EPS),
-    ]
     _log(
         "[END]",
         OrderedDict(
             [
                 ("task_results", results),
-                ("task_scores", ordered_scores),
-                ("tasks", [
-                    {"task_id": 1, "name": "fix-broken-join", "score": ordered_scores[0]},
-                    {"task_id": 2, "name": "eliminate-n-plus-one", "score": ordered_scores[1]},
-                    {"task_id": 3, "name": "full-optimization", "score": ordered_scores[2]},
-                ]),
                 ("average_score", average_score),
                 ("status", "success"),
             ]
